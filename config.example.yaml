@@ -1,0 +1,25 @@
+# adxctl configuration file
+nats:
+  # Runner type: "local-cli" (uses local nats-server binary) or "docker" (uses container)
+  runner: docker #"local-cli"
+
+  # NATS client connection port (default 4222)
+  port: 4222
+
+  # Directory for storage/JetStream data (mounted as volume into /data when using docker)
+  store_dir: ".trash/data" # ""
+
+  # Docker-specific configuration (used when runner is "docker")
+  docker:
+    # Docker image URI for NATS server
+    image: "nats:latest"
+
+pollers:
+  jira-default:
+    type: jira
+    enabled: true
+    interval: 1m
+    domain: your-domain.atlassian.net
+    email: user@example.com
+    api_token: "${JIRA_API_TOKEN}"
+    nats_url: "nats://127.0.0.1:4222"

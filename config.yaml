@@ -1,0 +1,15 @@
+# adxctl configuration file
+nats:
+  # Runner type: "local-cli" (uses local nats-server binary) or "docker" (uses container)
+  runner: "local-cli"
+
+  # NATS client connection port (default 4222)
+  port: 4222
+
+  # Directory for storage/JetStream data (mounted as volume into /data when using docker)
+  store_dir: ""
+
+  # Docker-specific configuration (used when runner is "docker")
+  docker:
+    # Docker image URI for NATS server
+    image: "nats:latest"
