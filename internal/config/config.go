@@ -10,11 +10,21 @@ import (
 	"github.com/spf13/viper"
 )
 
+// EventBusConfig holds config for the event bus.
+type EventBusConfig struct {
+	Type string     `mapstructure:"type"`
+	Nats NatsConfig `mapstructure:"nats"`
+}
+
 // Config holds the root configuration for adxctl
 type Config struct {
-	Nats    NatsConfig              `mapstructure:"nats" yaml:"nats"`
-	Server  NatsConfig              `mapstructure:"server" yaml:"server"` // Backwards compatibility fallback
-	Pollers map[string]PollerConfig `mapstructure:"pollers" yaml:"pollers"`
+	EventBus EventBusConfig          `mapstructure:"eventbus"`
+	Pollers  map[string]PollerConfig `mapstructure:"pollers"`
+	Agent    AgentConfig             `mapstructure:"agent"`
+
+	// Deprecated: use EventBus section
+	Nats   NatsConfig `mapstructure:"nats"`
+	Server NatsConfig `mapstructure:"server"`
 }
 
 // PollerConfig defines the configuration for a single poller instance
@@ -43,6 +53,44 @@ type DockerConfig struct {
 	Image string `mapstructure:"image" yaml:"image"`
 }
 
+// AgentConfig holds configuration for the agent system
+type AgentConfig struct {
+	Runners    AgentRunnersConfig `mapstructure:"runners"`
+	AIProvider AIProviderConfig   `mapstructure:"ai_provider"`
+}
+
+// AgentRunnersConfig holds configuration for the different task runners
+type AgentRunnersConfig struct {
+	Default    string               `mapstructure:"default"`
+	Local      LocalRunnerConfig    `mapstructure:"local"`
+	Docker     DockerRunnerConfig   `mapstructure:"docker"`
+	Kubernetes KubernetesRunnerConfig `mapstructure:"kubernetes"`
+}
+
+// LocalRunnerConfig holds configuration for the local runner.
+type LocalRunnerConfig struct {
+	Type   string `mapstructure:"type"`
+	Script string `mapstructure:"script,omitempty"` // Used when type is "local-script"
+}
+
+// DockerRunnerConfig is a placeholder for docker runner settings
+type DockerRunnerConfig struct{}
+
+// KubernetesRunnerConfig is a placeholder for kubernetes runner settings
+type KubernetesRunnerConfig struct{}
+
+// AIProviderConfig holds configuration for the AI model provider
+type AIProviderConfig struct {
+	Type   string         `mapstructure:"type"`
+	Google GoogleAIConfig `mapstructure:"google"`
+}
+
+// GoogleAIConfig holds configuration for the Google AI provider
+type GoogleAIConfig struct {
+	APIKey string `mapstructure:"api_key"`
+	Model  string `mapstructure:"model"`
+}
+
 const (
 	RunnerLocalCLI     = "local-cli"
 	RunnerDocker       = "docker"
@@ -54,6 +102,19 @@ const (
 
 // SetDefaults configures default values for NATS settings
 func SetDefaults(v *viper.Viper) {
+	// New eventbus defaults
+	v.SetDefault("eventbus.type", "nats")
+	v.SetDefault("eventbus.nats.runner", DefaultRunner)
+	v.SetDefault("eventbus.nats.port", DefaultPort)
+	v.SetDefault("eventbus.nats.store_dir", DefaultStoreDir)
+	v.SetDefault("eventbus.nats.docker.image", DefaultDockerImage)
+
+	// Agent defaults
+	v.SetDefault("agent.runners.default", "local")
+	v.SetDefault("agent.ai_provider.type", "google")
+	v.SetDefault("agent.ai_provider.google.model", "gemini-pro")
+
+	// Old defaults for backward compatibility
 	v.SetDefault("nats.runner", DefaultRunner)
 	v.SetDefault("nats.port", DefaultPort)
 	v.SetDefault("nats.store_dir", DefaultStoreDir)
@@ -98,27 +159,23 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse configuration: %w", err)
 	}
 
+	// Handle backward compatibility for nats/server config
+	if v.InConfig("nats") && !v.InConfig("eventbus") {
+		cfg.EventBus.Type = "nats"
+		cfg.EventBus.Nats = cfg.Nats
+	} else if v.InConfig("server") && !v.InConfig("eventbus") {
+		cfg.EventBus.Type = "nats"
+		cfg.EventBus.Nats = cfg.Server
+	}
+
 	// Expand environment variables in poller configurations
 	for name, pollerCfg := range cfg.Pollers {
 		expandedPollerCfg := expandPollerEnvVars(pollerCfg)
 		cfg.Pollers[name] = expandedPollerCfg
 	}
 
-	// If nats was not explicitly defined in config file but server was, copy from server
-	if v.InConfig("server") && !v.InConfig("nats") {
-		if cfg.Server.Runner != "" {
-			cfg.Nats.Runner = cfg.Server.Runner
-		}
-		if cfg.Server.Port != 0 {
-			cfg.Nats.Port = cfg.Server.Port
-		}
-		if cfg.Server.StoreDir != "" {
-			cfg.Nats.StoreDir = cfg.Server.StoreDir
-		}
-		if cfg.Server.Docker.Image != "" {
-			cfg.Nats.Docker.Image = cfg.Server.Docker.Image
-		}
-	}
+	// Expand environment variables in agent configuration
+	cfg.Agent.AIProvider.Google.APIKey = os.ExpandEnv(cfg.Agent.AIProvider.Google.APIKey)
 
 	return &cfg, nil
 }

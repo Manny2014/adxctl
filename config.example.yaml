@@ -1,18 +1,21 @@
 # adxctl configuration file
-nats:
-  # Runner type: "local-cli" (uses local nats-server binary) or "docker" (uses container)
-  runner: docker #"local-cli"
 
-  # NATS client connection port (default 4222)
-  port: 4222
+eventbus:
+  type: nats
+  nats:
+    # Runner type: "local-cli" (uses local nats-server binary) or "docker" (uses container)
+    runner: "local-cli"
 
-  # Directory for storage/JetStream data (mounted as volume into /data when using docker)
-  store_dir: ".trash/data" # ""
+    # NATS client connection port (default 4222)
+    port: 4222
 
-  # Docker-specific configuration (used when runner is "docker")
-  docker:
-    # Docker image URI for NATS server
-    image: "nats:latest"
+    # Directory for storage/JetStream data (mounted as volume into /data when using docker)
+    store_dir: ""
+
+    # Docker-specific configuration (used when runner is "docker")
+    docker:
+      # Docker image URI for NATS server
+      image: "nats:latest"
 
 pollers:
   jira-default:
@@ -23,3 +26,17 @@ pollers:
     email: user@example.com
     api_token: "${JIRA_API_TOKEN}"
     nats_url: "nats://127.0.0.1:4222"
+
+agent:
+  runners:
+    default: local # or remote
+    local:
+      type: gemini-cli # or "antigravity-cli", "local-script"
+      # script: "/path/to/my/script.sh" # Only used if type is "local-script"
+    docker: {}
+    kubernetes: {}
+  ai_provider:
+    type: google
+    google:
+      api_key: "${GOOGLE_API_KEY}"
+      model: "gemini-pro"

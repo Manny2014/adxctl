@@ -33,7 +33,7 @@ PLATFORMS := \
 	linux/amd64 \
 	linux/arm64
 
-.PHONY: all build build-all clean test vet tidy help $(PLATFORMS) nats-stream-info nats-stream-view nats-kv-state nats-kv-list
+.PHONY: all build build-all clean test vet tidy help $(PLATFORMS) eventbus-start eventbus-stop nats-stream-info nats-stream-view nats-kv-state nats-kv-list
 
 all: clean build
 
@@ -52,6 +52,8 @@ help:
 	@echo "  vet                  Run go vet static analysis"
 	@echo "  test                 Run tests"
 	@echo "  tidy                 Run go mod tidy"
+	@echo "  eventbus-start       Start NATS eventbus via docker using config.example.yaml"
+	@echo "  eventbus-stop        Stop NATS eventbus via docker using config.example.yaml"
 	@echo "  nats-stream-info     View details and statistics of the JIRA_EVENTS NATS stream"
 	@echo "  nats-stream-view     View JIRA_EVENTS stream messages (override default with SUBJECT=...)"
 	@echo "  nats-kv-state        View current poll state watermark in NATS KV store"
@@ -110,11 +112,13 @@ tidy:
 	@echo "==> Tidying dependencies..."
 	$(GO) mod tidy
 
-nats-start:
-	./bin/adxctl nats start --runner docker --config config.example.yaml   
+## eventbus-start: Start NATS eventbus via docker
+eventbus-start:
+	./bin/adxctl eventbus start --runner docker --config config.example.yaml
 
-nats-stop:
-	./bin/adxctl nats stop --runner docker --config config.example.yaml   
+## eventbus-stop: Stop NATS eventbus via docker
+eventbus-stop:
+	./bin/adxctl eventbus stop --runner docker --config config.example.yaml
 
 ## nats-stream-info: Display info of JIRA_EVENTS stream
 nats-stream-info:
@@ -132,4 +136,5 @@ nats-kv-state:
 ## nats-kv-list: List KV buckets in NATS
 nats-kv-list:
 	nats kv ls
+
 
