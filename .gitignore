@@ -19,3 +19,7 @@ profile.out
 .vscode/
 .trash/
 web/node_modules/*
+
+# local files
+.env 
+config.local.yaml
