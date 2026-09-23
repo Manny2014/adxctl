@@ -160,12 +160,24 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	}
 
 	// Handle backward compatibility for nats/server config
-	if v.InConfig("nats") && !v.InConfig("eventbus") {
+	if v.InConfig("server") && !v.InConfig("nats") {
+		if cfg.Server.Runner != "" {
+			cfg.Nats.Runner = cfg.Server.Runner
+		}
+		if cfg.Server.Port != 0 {
+			cfg.Nats.Port = cfg.Server.Port
+		}
+		if cfg.Server.StoreDir != "" {
+			cfg.Nats.StoreDir = cfg.Server.StoreDir
+		}
+		if cfg.Server.Docker.Image != "" {
+			cfg.Nats.Docker.Image = cfg.Server.Docker.Image
+		}
+	}
+
+	if (v.InConfig("nats") || v.InConfig("server")) && !v.InConfig("eventbus") {
 		cfg.EventBus.Type = "nats"
 		cfg.EventBus.Nats = cfg.Nats
-	} else if v.InConfig("server") && !v.InConfig("eventbus") {
-		cfg.EventBus.Type = "nats"
-		cfg.EventBus.Nats = cfg.Server
 	}
 
 	// Expand environment variables in poller configurations

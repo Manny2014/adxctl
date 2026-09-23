@@ -64,24 +64,26 @@ type JiraSearchRequest struct {
 
 // Run connects to NATS, configures JetStream streams/buckets, and starts the polling loop.
 func Run(ctx context.Context, cfg Config, client *adx.Client) error {
-	log.Printf("[INIT] Ensuring JetStream stream %q exists with subjects %v...", StreamName, []string{"jira.>"})
-	// 2. Ensure JetStream Stream Exists
+	// FIX 1: Bind stream to tasks.jira.> to capture published subjects "tasks.jira.<eventType>"
+	log.Printf("[INIT] Ensuring JetStream stream %q exists with subjects %v...", StreamName, []string{"tasks.jira.>"})
 	_, err := client.EnsureStream(ctx, jetstream.StreamConfig{
 		Name:        StreamName,
 		Description: "Polled Jira events",
-		Subjects:    []string{"jira.>"},
+		Subjects:    []string{"tasks.jira.>"},
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to setup JetStream stream: %w", err)
 	}
 	log.Printf("[INIT] JetStream stream %q is verified and ready.", StreamName)
 
 	log.Printf("[INIT] Ensuring state Key-Value bucket %q exists...", WatermarkBucket)
-	// 3. Setup KV Bucket for Watermarking
+
 	kv, err := client.EnsureKV(ctx, jetstream.KeyValueConfig{
 		Bucket:      WatermarkBucket,
 		Description: "Stores the last poll timestamp for state recovery",
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to setup KV bucket: %w", err)
 	}
@@ -89,13 +91,12 @@ func Run(ctx context.Context, cfg Config, client *adx.Client) error {
 
 	log.Printf("[INIT] Jira Poller successfully started for domain %q. Polling interval: %s.", cfg.JiraDomain, cfg.PollInterval)
 
-	// Run ticker loop
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
 
-	// Run first cycle immediately
+	// FIX 2: Trigger initial run with a distinct context deadline
 	log.Println("[POLL] Triggering initial polling execution cycle...")
-	pollAndPublish(ctx, cfg, client, kv)
+	runPoll(ctx, cfg, client, kv)
 
 	for {
 		select {
@@ -104,18 +105,23 @@ func Run(ctx context.Context, cfg Config, client *adx.Client) error {
 			return nil
 		case <-ticker.C:
 			log.Println("[POLL] Triggering scheduled polling execution cycle...")
-			pollAndPublish(ctx, cfg, client, kv)
+			// FIX 2: Instantiate a fresh context per ticker interval
+			runPoll(ctx, cfg, client, kv)
 		}
 	}
 }
 
+// Helper wrapper to ensure fresh per-execution contexts
+func runPoll(parentCtx context.Context, cfg Config, client *adx.Client, kv jetstream.KeyValue) {
+	pollCtx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
+	defer cancel()
+	pollAndPublish(pollCtx, cfg, client, kv)
+}
+
 func pollAndPublish(ctx context.Context, cfg Config, client *adx.Client, kv jetstream.KeyValue) {
-	// 1. Determine starting timestamp from KV store or fallback to 5m ago
 	lastPollTime := getLastPollTime(ctx, kv)
 	currentPollTime := time.Now().UTC()
 
-	// JQL time format: "2026-09-05 20:00"
-	// Jira searches across ALL issue types (standard + sub-tasks) by default
 	jqlTimeStr := lastPollTime.Format("2006-01-02 15:04")
 	jql := fmt.Sprintf(`updated >= "%s" ORDER BY updated ASC`, jqlTimeStr)
 
@@ -136,14 +142,12 @@ func pollAndPublish(ctx context.Context, cfg Config, client *adx.Client, kv jets
 
 	latestIssueUpdatedTime := lastPollTime
 
-	// 2. Process and publish all tickets (Issues, Sub-tasks, Epics, etc.)
 	for i, issue := range issues {
 		projectKey := issue.Fields.Project.Key
 		if projectKey == "" {
 			projectKey = "UNKNOWN"
 		}
 
-		// Determine event type (created vs. updated)
 		var eventType string
 		createdTime, err := time.Parse("2006-01-02T15:04:05.000-0700", issue.Fields.Created)
 		if err != nil {
@@ -157,7 +161,7 @@ func pollAndPublish(ctx context.Context, cfg Config, client *adx.Client, kv jets
 			}
 		}
 
-		// Subject format: jira.<eventType>.<jiraProjectId>
+		// Published subject: tasks.jira.issue_created / tasks.jira.issue_updated
 		subject := fmt.Sprintf("tasks.jira.%s", eventType)
 
 		issueBytes, err := json.Marshal(issue)
@@ -194,7 +198,6 @@ func pollAndPublish(ctx context.Context, cfg Config, client *adx.Client, kv jets
 		log.Printf("[POLL] [%d/%d] Successfully published %s %s [%s] to NATS (Stream Seq: %d).",
 			i+1, len(issues), issue.Fields.IssueType.Name, issue.Key, issue.Fields.Summary, ack.Sequence)
 
-		// Parse updated timestamp to safely track watermark based on processed batch items
 		if parsedTime, err := time.Parse("2006-01-02T15:04:05.000-0700", issue.Fields.Updated); err == nil {
 			if parsedTime.After(latestIssueUpdatedTime) {
 				latestIssueUpdatedTime = parsedTime
@@ -202,7 +205,6 @@ func pollAndPublish(ctx context.Context, cfg Config, client *adx.Client, kv jets
 		}
 	}
 
-	// 3. Persist updated watermark to KV store
 	if latestIssueUpdatedTime.After(lastPollTime) {
 		setLastPollTime(ctx, kv, latestIssueUpdatedTime)
 	} else {
