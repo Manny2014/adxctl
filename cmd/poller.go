@@ -8,7 +8,7 @@ import (
 var pollerCmd = &cobra.Command{
 	Use:   "poller",
 	Short: "Manage background data pollers",
-	Long:  `Manage data pollers (start, stop) to fetch events from external systems (like Jira) and publish them to NATS.`,
+	Long:  `Manage data pollers (deploy, stop) to fetch events from external systems (like Jira) and publish them to NATS.`,
 }
 
 func init() {

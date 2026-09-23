@@ -2,6 +2,7 @@ package agent
 
 import (
 	"adxctl/internal/config"
+	"adxctl/pkg/adx"
 	"bytes"
 	"context"
 	"fmt"
@@ -19,8 +20,8 @@ func NewLocalRunner(cfg config.LocalRunnerConfig) (*LocalRunner, error) {
 }
 
 // Run executes the task locally.
-func (r *LocalRunner) Run(ctx context.Context, task *Task) error {
-	fmt.Printf("LocalRunner: Running task %s of type %s with runner type %s\n", task.ID, task.Type, r.cfg.Type)
+func (r *LocalRunner) Run(ctx context.Context, subject string, task *adx.Task) error {
+	fmt.Printf("LocalRunner: Running task %s of type %s on subject %s with runner type %s\n", task.ID, task.Type, subject, r.cfg.Type)
 
 	switch r.cfg.Type {
 	case "gemini-cli":
@@ -46,7 +47,8 @@ func (r *LocalRunner) Run(ctx context.Context, task *Task) error {
 		fmt.Printf("Local script output:\n%s\n", stdout.String())
 
 	default:
-		return fmt.Errorf("unsupported local runner type: %s", r.cfg.Type)
+		// a default behavior can be to just print the task
+		fmt.Printf("Received task: %+v\n", task)
 	}
 
 	return nil

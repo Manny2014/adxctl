@@ -1,4 +1,4 @@
-package nats
+package adx
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
-// Config defines connection and operational settings for the Client.
+// NatsConfig defines connection and operational settings for the Client.
 type NatsConfig struct {
 	URL            string        // e.g. "nats://localhost:4222" or nats.DefaultURL
 	ConnectTimeout time.Duration // Timeout for establishing connection (default: 5s)
@@ -109,7 +109,7 @@ func (c *Client) EnsureKV(ctx context.Context, cfg jetstream.KeyValueConfig) (je
 	return c.js.CreateOrUpdateKeyValue(ctx, cfg)
 }
 
-// EnsureKV idempotently creates or updates a Key-Value bucket.
+// EnsureDurableConsumer idempotently creates or updates a Key-Value bucket.
 func (c *Client) EnsureDurableConsumer(ctx context.Context, consumerName string, stream string, cfg jetstream.StreamConfig) (jetstream.Consumer, error) {
 
 	return c.js.CreateOrUpdateConsumer(ctx, stream, jetstream.ConsumerConfig{
@@ -135,62 +135,3 @@ func (c *Client) Close() {
 		}
 	}
 }
-
-
-/* Example Usage...
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"time"
-
-	"github.com/nats-io/nats.go/jetstream"
-	"your_module/nats" // Update with your Go module path
-)
-
-func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// 1. Initialize the Client
-	client, err := nats.NewClient(nats.Config{
-		URL:            "nats://127.0.0.1:4222",
-		Name:           "jira-integration-service",
-		ConnectTimeout: 3 * time.Second,
-	})
-	if err != nil {
-		log.Fatalf("Failed to initialize NATS client: %v", err)
-	}
-	defer client.Close()
-
-	// 2. Ensure Stream Exists
-	_, err = client.EnsureStream(ctx, jetstream.StreamConfig{
-		Name:     "JIRA_EVENTS",
-		Subjects: []string{"jira.>"},
-	})
-	if err != nil {
-		log.Fatalf("Failed to create stream: %v", err)
-	}
-
-	// 3. Publish a Message
-	ack, err := client.Publish(ctx, "jira.issue_created.PROJ", []byte(`{"id": "10001"}`))
-	if err != nil {
-		log.Fatalf("Publish error: %v", err)
-	}
-	fmt.Printf("Message published successfully! Sequence: %d\n", ack.Sequence)
-
-	// 4. Ensure KV Bucket Exists
-	kv, err := client.EnsureKV(ctx, jetstream.KeyValueConfig{
-		Bucket: "poller_watermarks",
-		TTL:    24 * time.Hour,
-	})
-	if err != nil {
-		log.Fatalf("KV error: %v", err)
-	}
-
-	// Put/Get from KV
-	kv.Put(ctx, "last_run", []byte(time.Now().Format(time.RFC3339)))
-}
-*/

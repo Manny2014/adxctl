@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"adxctl/pkg/adx"
 	"context"
 	"fmt"
 )
@@ -14,8 +15,8 @@ func NewKubernetesRunner() (*KubernetesRunner, error) {
 }
 
 // Run executes the task in a Kubernetes cluster.
-func (r *KubernetesRunner) Run(ctx context.Context, task *Task) error {
-	fmt.Printf("KubernetesRunner: Running task %s of type %s\n", task.ID, task.Type)
+func (r *KubernetesRunner) Run(ctx context.Context, subject string, task *adx.Task) error {
+	fmt.Printf("KubernetesRunner: Running task %s of type %s on subject %s\n", task.ID, task.Type, subject)
 	// Placeholder for Kubernetes task execution logic
 	return nil
 }

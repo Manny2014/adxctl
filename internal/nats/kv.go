@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"adxctl/pkg/adx"
 	"context"
 	"errors"
 	"fmt"
@@ -11,14 +12,14 @@ import (
 
 // KVConfig holds the server connection and bucket setup details.
 type KVConfig struct {
-	NatsConfig
+	adx.NatsConfig
 	Bucket string        // Cache bucket name
 	TTL    time.Duration // Default TTL for entries in this bucket (0 = no expiry)
 }
 
 // KVClient wraps NATS JetStream Key-Value store with typical cache APIs.
 type KVClient struct {
-	client *Client
+	client *adx.Client
 	kv     jetstream.KeyValue
 }
 
@@ -28,7 +29,7 @@ func NewKVClient(ctx context.Context, cfg KVConfig) (*KVClient, error) {
 		return nil, errors.New("bucket name is required")
 	}
 
-	client, err := NewClient(cfg.NatsConfig)
+	client, err := adx.NewClient(cfg.NatsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("nats client init failed: %w", err)
 	}

@@ -1,3 +1,11 @@
+<!--
+    Sync Impact Report
+    - Version: 1.2.0 -> 1.3.0
+    - Modified Principles: None
+    - Added sections: Core Principles/VI. Dependency Immutability
+    - Removed sections: None
+    - Follow-up TODOs: None
+-->
 # Example-1 Constitution
 
 ## Core Principles
@@ -17,10 +25,26 @@ Architectural and design decisions MUST prefer simple, readable, and maintainabl
 
 *Rationale*: Premature abstractions increase maintenance overhead, obscure intent, and slow down future iteration without providing immediate practical value.
 
+### IV. Containerized CI Testing
+All features MUST include automated tests that can be executed within a containerized Continuous Integration (CI) environment. Test suites SHOULD be self-contained, requiring no external dependencies beyond what is defined in the container, to ensure portability and reliable execution.
+
+*Rationale*: Containerized testing guarantees a consistent and reproducible test environment, eliminates "works on my machine" issues, and enables reliable, automated quality gates in the CI/CD pipeline.
+
+### V. Continuous Compilation
+After any update to dependencies or significant code changes, local compilation commands MUST be executed to ensure the project builds successfully. This practice MUST be followed to prevent integration issues and maintain a stable codebase.
+
+*Rationale*: Frequent compilation catches errors early, reduces the risk of breaking the build, and ensures that all changes are integrated correctly, leading to a more stable and reliable development process.
+
+### VI. Dependency Immutability
+Code that is a dependency or is not directly owned by the project MUST NEVER be modified. All external libraries, packages, vendored modules, and upstream dependencies are strictly immutable. Any necessary behavioral adjustments, bug workarounds, or custom integrations MUST be achieved through external adapters, composition, configuration, or upstream contributions rather than in-place changes to unowned code.
+
+*Rationale*: Directly altering dependency or unowned code compromises build reproducibility, creates untracked drift, breaks upgrade and patching paths, and introduces hidden maintenance liabilities.
+
 ## Quality & Architectural Standards
 - **Test Boundaries**: Tests must target isolated units and explicit interfaces, avoiding fragile coupling to external or shared mutable state.
 - **Complexity Review**: Any proposed abstraction or architectural layer must be justified by demonstrable necessity and measurable maintainability benefits.
 - **Maintainability First**: Code readability, deterministic execution, and ease of onboarding take precedence over clever or overly condensed constructs.
+- **Dependency Integrity**: External code and dependencies must remain untouched; customizations must use supported extension points, wrapper abstractions, or official upstream mechanisms.
 
 ## Development Workflow & Verification Gates
 - **Pre-Merge Verification**: Automated test suites validating business logic and feature isolation must pass before changes are accepted.
@@ -37,4 +61,4 @@ This constitution defines the fundamental engineering standards and practices fo
   - **PATCH**: Non-semantic clarifications, wording refinements, and typo fixes.
 - **Compliance**: Ongoing development, pull requests, and architecture reviews must continuously verify compliance with these principles.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-22 | **Last Amended**: 2026-09-22
+**Version**: 1.3.0 | **Ratified**: 2026-09-22 | **Last Amended**: 2026-09-22

@@ -1,7 +1,7 @@
 package pollers
 
 import (
-	localnats "adxctl/internal/nats"
+	"adxctl/pkg/adx"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -19,7 +20,6 @@ type Config struct {
 	JiraDomain   string
 	JiraEmail    string
 	JiraAPIToken string
-	NatsURL      string
 	PollInterval time.Duration
 }
 
@@ -50,13 +50,6 @@ type JiraIssue struct {
 	} `json:"fields"`
 }
 
-// EventPayload represents the message written to JetStream.
-type EventPayload struct {
-	EventType string      `json:"eventType"`
-	PolledAt  time.Time   `json:"polledAt"`
-	Issue     JiraIssue   `json:"issue"`
-}
-
 const (
 	StreamName      = "JIRA_EVENTS"
 	WatermarkBucket = "jira_poller_state"
@@ -70,24 +63,10 @@ type JiraSearchRequest struct {
 }
 
 // Run connects to NATS, configures JetStream streams/buckets, and starts the polling loop.
-func Run(ctx context.Context, cfg Config) error {
-	log.Printf("[INIT] Connecting to NATS server at %q...", cfg.NatsURL)
-	
-	// 1. Connect to NATS using the local client
-	client, err := localnats.NewClient(localnats.NatsConfig{
-		URL:  cfg.NatsURL,
-		Name: "jira-poller",
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to initialize NATS client: %w", err)
-	}
-	defer client.Close()
-	log.Println("[INIT] Successfully connected to NATS server.")
-
+func Run(ctx context.Context, cfg Config, client *adx.Client) error {
 	log.Printf("[INIT] Ensuring JetStream stream %q exists with subjects %v...", StreamName, []string{"jira.>"})
 	// 2. Ensure JetStream Stream Exists
-	_, err = client.EnsureStream(ctx, jetstream.StreamConfig{
+	_, err := client.EnsureStream(ctx, jetstream.StreamConfig{
 		Name:        StreamName,
 		Description: "Polled Jira events",
 		Subjects:    []string{"jira.>"},
@@ -130,7 +109,7 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 }
 
-func pollAndPublish(ctx context.Context, cfg Config, client *localnats.Client, kv jetstream.KeyValue) {
+func pollAndPublish(ctx context.Context, cfg Config, client *adx.Client, kv jetstream.KeyValue) {
 	// 1. Determine starting timestamp from KV store or fallback to 5m ago
 	lastPollTime := getLastPollTime(ctx, kv)
 	currentPollTime := time.Now().UTC()
@@ -179,17 +158,25 @@ func pollAndPublish(ctx context.Context, cfg Config, client *localnats.Client, k
 		}
 
 		// Subject format: jira.<eventType>.<jiraProjectId>
-		subject := fmt.Sprintf("jira.%s.%s", eventType, projectKey)
+		subject := fmt.Sprintf("tasks.jira.%s", eventType)
 
-		payload := EventPayload{
-			EventType: eventType,
-			PolledAt:  currentPollTime,
-			Issue:     issue,
+		issueBytes, err := json.Marshal(issue)
+		if err != nil {
+			log.Printf("[ERROR] [%d/%d] Failed to marshal issue for %s %s: %v",
+				i+1, len(issues), issue.Fields.IssueType.Name, issue.Key, err)
+			continue
 		}
 
-		bytes, err := json.Marshal(payload)
+		task := adx.Task{
+			ID:      uuid.New().String(),
+			Source:  "jira",
+			Type:    eventType,
+			Payload: issueBytes,
+		}
+
+		taskBytes, err := json.Marshal(task)
 		if err != nil {
-			log.Printf("[ERROR] [%d/%d] Failed to marshal event payload for %s %s: %v",
+			log.Printf("[ERROR] [%d/%d] Failed to marshal task for %s %s: %v",
 				i+1, len(issues), issue.Fields.IssueType.Name, issue.Key, err)
 			continue
 		}
@@ -197,7 +184,7 @@ func pollAndPublish(ctx context.Context, cfg Config, client *localnats.Client, k
 		log.Printf("[POLL] [%d/%d] Publishing '%s' event for %s %s to NATS subject %q...",
 			i+1, len(issues), eventType, issue.Fields.IssueType.Name, issue.Key, subject)
 
-		ack, err := client.Publish(ctx, subject, bytes)
+		ack, err := client.Publish(ctx, subject, taskBytes)
 		if err != nil {
 			log.Printf("[ERROR] [%d/%d] JetStream publish failed for %s %s: %v",
 				i+1, len(issues), issue.Fields.IssueType.Name, issue.Key, err)

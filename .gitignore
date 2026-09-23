@@ -23,3 +23,28 @@ web/node_modules/*
 # local files
 .env 
 config.local.yaml
+
+# Go
+vendor/
+
+# Logs
+*.log
+
+# Environment variables
+.env*
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Java
+target/
+*.class
+*.jar
+.gradle/
+build/
