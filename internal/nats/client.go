@@ -109,6 +109,16 @@ func (c *Client) EnsureKV(ctx context.Context, cfg jetstream.KeyValueConfig) (je
 	return c.js.CreateOrUpdateKeyValue(ctx, cfg)
 }
 
+// EnsureKV idempotently creates or updates a Key-Value bucket.
+func (c *Client) EnsureDurableConsumer(ctx context.Context, consumerName string, stream string, cfg jetstream.StreamConfig) (jetstream.Consumer, error) {
+
+	return c.js.CreateOrUpdateConsumer(ctx, stream, jetstream.ConsumerConfig{
+		Durable: consumerName,
+		AckPolicy: jetstream.AckExplicitPolicy, // Requires explicit message acknowledgement
+	})
+}
+
+
 // Publish convenient wrapper to publish messages to a JetStream subject.
 func (c *Client) Publish(ctx context.Context, subject string, data []byte) (*jetstream.PubAck, error) {
 	return c.js.Publish(ctx, subject, data)

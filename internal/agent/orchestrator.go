@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 )
 
 // Orchestrator is responsible for consuming events and dispatching tasks to the appropriate runners.
@@ -17,6 +18,7 @@ func NewOrchestrator() (*Orchestrator, error) {
 // Run starts the orchestrator's event consumption loop.
 func (o *Orchestrator) Run(ctx context.Context) error {
 	// Subscription and task dispatching logic will go here.
+	fmt.Println("Running orchestrator...")
 	<-ctx.Done()
 	return nil
 }

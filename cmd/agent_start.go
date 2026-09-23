@@ -17,6 +17,7 @@ var agentStartCmd = &cobra.Command{
 		// Orchestrator setup and execution will go here.
 		// For now, this is a placeholder.
 		orchestrator, err := agent.NewOrchestrator()
+
 		if err != nil {
 			return err
 		}

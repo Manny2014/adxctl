@@ -72,11 +72,13 @@ type JiraSearchRequest struct {
 // Run connects to NATS, configures JetStream streams/buckets, and starts the polling loop.
 func Run(ctx context.Context, cfg Config) error {
 	log.Printf("[INIT] Connecting to NATS server at %q...", cfg.NatsURL)
+	
 	// 1. Connect to NATS using the local client
 	client, err := localnats.NewClient(localnats.NatsConfig{
 		URL:  cfg.NatsURL,
 		Name: "jira-poller",
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to initialize NATS client: %w", err)
 	}

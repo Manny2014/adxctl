@@ -8,7 +8,7 @@ type Config struct {
 }
 
 type JiraEvent struct {
-	config Config  `json:"config"`
+	Config Config  `json:"config"`
 	Domain string `json:"domain"`
 }
 
